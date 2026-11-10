@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, RotateCcw, Search } from 'lucide-react'
+import { Plus, RefreshCw, Search } from 'lucide-react'
 import { TEAM } from '../data/seed'
 import type { SyncState } from '../hooks/useBoard'
 import { Avatar } from './Avatar'
@@ -9,7 +9,6 @@ interface HeaderProps {
   assigneeFilter: string | 'all'
   onAssigneeFilter: (value: string | 'all') => void
   onCreate: () => void
-  onReset: () => void
   onRefresh: () => void
   sync: SyncState
   syncError: string | null
@@ -25,7 +24,6 @@ export function Header({
   assigneeFilter,
   onAssigneeFilter,
   onCreate,
-  onReset,
   onRefresh,
   sync,
   syncError,
@@ -102,10 +100,6 @@ export function Header({
             className={sync === 'loading' || sync === 'refreshing' ? 'spin' : undefined}
           />
           Refresh
-        </button>
-        <button type="button" className="btn ghost" onClick={onReset} disabled={!ready}>
-          <RotateCcw size={16} />
-          Reset demo
         </button>
         <button type="button" className="btn primary" onClick={onCreate} disabled={!ready}>
           <Plus size={16} />

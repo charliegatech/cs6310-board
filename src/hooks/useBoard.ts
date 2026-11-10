@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SEED_STATE, PROJECT_KEY } from '../data/seed'
+import { PROJECT_KEY } from '../data/seed'
 import { fetchBoard, saveBoard } from '../lib/boardClient'
 import type {
   BoardState,
@@ -56,25 +56,9 @@ export function useBoard() {
 
         setSync(readyRef.current ? 'refreshing' : 'loading')
         try {
-          if (dirtyRef.current) {
-            dirtyRef.current = false
-            const saved = await saveBoard(stateRef.current)
-            apply(saved)
-          }
-
           const remote = await fetchBoard()
-          if (dirtyRef.current) {
-            setSync('saving')
-            setSyncError(null)
-            return
-          }
-          if (!remote) {
-            const seeded = await saveBoard(structuredClone(SEED_STATE))
-            if (!dirtyRef.current) apply(seeded)
-          } else {
-            apply(remote)
-          }
-          setSync(dirtyRef.current ? 'saving' : 'live')
+          apply(remote ?? { tickets: [], nextNumber: 1 })
+          setSync('live')
           setSyncError(null)
         } catch (error) {
           setSync('error')
@@ -212,10 +196,6 @@ export function useBoard() {
     [scheduleSave],
   )
 
-  const resetBoard = useCallback(() => {
-    scheduleSave(structuredClone(SEED_STATE))
-  }, [scheduleSave])
-
   const refresh = useCallback(() => pull(), [pull])
 
   const ticketsByStatus = useMemo(() => {
@@ -241,7 +221,6 @@ export function useBoard() {
     updateTicket,
     deleteTicket,
     moveTicket,
-    resetBoard,
     refresh,
   }
 }

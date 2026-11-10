@@ -14,7 +14,6 @@ export default function App() {
     updateTicket,
     deleteTicket,
     moveTicket,
-    resetBoard,
     refresh,
     sync,
     syncError,
@@ -64,15 +63,6 @@ export default function App() {
         onCreate={() => {
           setActiveTicket(null)
           setModalOpen(true)
-        }}
-        onReset={() => {
-          if (
-            confirm(
-              'Reset the shared board for the whole team back to the sample tickets?',
-            )
-          ) {
-            resetBoard()
-          }
         }}
         onRefresh={() => {
           void refresh()

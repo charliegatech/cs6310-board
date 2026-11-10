@@ -11,9 +11,7 @@ Everyone shares one live JSON document, `board.json`. Creating, editing, or movi
 - Types: story, task, bug, epic
 - Priority, assignee, story points, labels
 - Search and assignee filters
-- Sample CS6310 ride-sharing project tickets included
-- **Refresh** reloads `board.json` so you see teammates' updates
-- **Reset demo** restores the sample tickets for everyone
+- **Refresh** reloads the current `board.json` and does not add tickets
 
 ## Local development
 
