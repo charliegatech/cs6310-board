@@ -35,7 +35,7 @@ npm run preview
 git add .
 git commit -m "feat: add CS6310 team ticket board"
 git branch -M main
-git remote add origin https://github.com/YOUR_USER/cs6310-board.git
+git remote add origin https://github.com/charliegatech/cs6310-board.git
 git push -u origin main
 ```
 
