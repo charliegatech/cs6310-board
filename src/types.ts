@@ -27,6 +27,7 @@ export interface Ticket {
 export interface BoardState {
   tickets: Ticket[]
   nextNumber: number
+  savedAt?: string
 }
 
 export const STATUSES: { id: Status; label: string }[] = [

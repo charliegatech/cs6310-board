@@ -168,6 +168,57 @@
   color: var(--text);
 }
 
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.sync-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #6b778c;
+}
+
+.sync-dot.live { background: #00875a; }
+.sync-dot.saving,
+.sync-dot.refreshing { background: #ff8b00; }
+.sync-dot.error { background: #de350b; }
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.board-message {
+  padding: 4rem 1.5rem;
+  text-align: center;
+  color: var(--text);
+}
+
+.board-message h2 {
+  margin: 0 0 0.4rem;
+}
+
+.board-message p {
+  margin: 0;
+  color: var(--muted);
+}
+
 .btn.danger {
   background: #ffebe6;
   color: #de350b;

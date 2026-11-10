@@ -15,6 +15,11 @@ export default function App() {
     deleteTicket,
     moveTicket,
     resetBoard,
+    refresh,
+    sync,
+    syncError,
+    savedAt,
+    ready,
   } = useBoard()
 
   const [query, setQuery] = useState('')
@@ -61,14 +66,36 @@ export default function App() {
           setModalOpen(true)
         }}
         onReset={() => {
-          if (confirm('Reset the board to the sample CS6310 demo data?')) {
+          if (
+            confirm(
+              'Reset the shared board for the whole team back to the sample tickets?',
+            )
+          ) {
             resetBoard()
           }
         }}
+        onRefresh={() => {
+          void refresh()
+        }}
+        sync={sync}
+        syncError={syncError}
+        savedAt={savedAt}
+        ready={ready}
         total={tickets.length}
         done={doneCount}
       />
 
+      {sync === 'error' && tickets.length === 0 ? (
+        <main className="board-message">
+          <h2>Shared board unavailable</h2>
+          <p>{syncError}</p>
+        </main>
+      ) : !ready ? (
+        <main className="board-message">
+          <h2>Loading shared board…</h2>
+          <p>Pulling the latest tickets from board.json.</p>
+        </main>
+      ) : (
       <main className="board">
         {STATUSES.map((status) => (
           <Column
@@ -85,6 +112,7 @@ export default function App() {
           />
         ))}
       </main>
+      )}
 
       <TicketModal
         open={modalOpen}

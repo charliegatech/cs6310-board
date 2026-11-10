@@ -5,7 +5,22 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions]
+  node_bundler = "esbuild"
+
+# board.json is the live shared database, not a static file.
+[[redirects]]
+  from = "/board.json"
+  to = "/.netlify/functions/board"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/board.json"
+  [headers.values]
+    Cache-Control = "no-store"

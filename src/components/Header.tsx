@@ -1,5 +1,6 @@
-import { Plus, RotateCcw, Search } from 'lucide-react'
+import { Plus, RefreshCw, RotateCcw, Search } from 'lucide-react'
 import { TEAM } from '../data/seed'
+import type { SyncState } from '../hooks/useBoard'
 import { Avatar } from './Avatar'
 
 interface HeaderProps {
@@ -9,6 +10,11 @@ interface HeaderProps {
   onAssigneeFilter: (value: string | 'all') => void
   onCreate: () => void
   onReset: () => void
+  onRefresh: () => void
+  sync: SyncState
+  syncError: string | null
+  savedAt?: string
+  ready: boolean
   total: number
   done: number
 }
@@ -20,6 +26,11 @@ export function Header({
   onAssigneeFilter,
   onCreate,
   onReset,
+  onRefresh,
+  sync,
+  syncError,
+  savedAt,
+  ready,
   total,
   done,
 }: HeaderProps) {
@@ -44,6 +55,10 @@ export function Header({
           <div className="progress-track">
             <div className="progress-fill" style={{ width: `${progress}%` }} />
           </div>
+          <p className="sync-pill" aria-live="polite" title={syncError ?? undefined}>
+            <span className={`sync-dot ${sync}`} />
+            {syncText(sync, savedAt, syncError)}
+          </p>
         </div>
       </div>
 
@@ -81,15 +96,33 @@ export function Header({
           ))}
         </div>
 
-        <button type="button" className="btn ghost" onClick={onReset}>
+        <button type="button" className="btn ghost" onClick={onRefresh}>
+          <RefreshCw
+            size={16}
+            className={sync === 'loading' || sync === 'refreshing' ? 'spin' : undefined}
+          />
+          Refresh
+        </button>
+        <button type="button" className="btn ghost" onClick={onReset} disabled={!ready}>
           <RotateCcw size={16} />
           Reset demo
         </button>
-        <button type="button" className="btn primary" onClick={onCreate}>
+        <button type="button" className="btn primary" onClick={onCreate} disabled={!ready}>
           <Plus size={16} />
           Create
         </button>
       </div>
     </header>
   )
+}
+
+function syncText(sync: SyncState, savedAt: string | undefined, error: string | null) {
+  if (sync === 'loading') return 'Loading shared board…'
+  if (sync === 'refreshing') return 'Refreshing…'
+  if (sync === 'saving') return 'Saving…'
+  if (sync === 'error') return error ?? 'Sync failed'
+  if (!savedAt) return 'Live · shared board'
+  const time = new Date(savedAt)
+  if (Number.isNaN(time.getTime())) return 'Live · shared board'
+  return `Live · ${time.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
 }

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SEED_STATE, PROJECT_KEY } from '../data/seed'
+import { fetchBoard, saveBoard } from '../lib/boardClient'
 import type {
   BoardState,
   Priority,
@@ -8,21 +9,9 @@ import type {
   TicketType,
 } from '../types'
 
-const STORAGE_KEY = 'cs6310-board-v1'
+const EMPTY: BoardState = { tickets: [], nextNumber: 1 }
 
-function loadState(): BoardState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return structuredClone(SEED_STATE)
-    const parsed = JSON.parse(raw) as BoardState
-    if (!parsed.tickets || typeof parsed.nextNumber !== 'number') {
-      return structuredClone(SEED_STATE)
-    }
-    return parsed
-  } catch {
-    return structuredClone(SEED_STATE)
-  }
-}
+export type SyncState = 'loading' | 'refreshing' | 'saving' | 'live' | 'error'
 
 export interface TicketDraft {
   title: string
@@ -36,14 +25,117 @@ export interface TicketDraft {
 }
 
 export function useBoard() {
-  const [state, setState] = useState<BoardState>(() => loadState())
+  const [state, setState] = useState<BoardState>(EMPTY)
+  const [sync, setSync] = useState<SyncState>('loading')
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const stateRef = useRef(state)
+  const dirtyRef = useRef(false)
+  const timerRef = useRef<number | null>(null)
+  const queueRef = useRef(Promise.resolve())
+  const readyRef = useRef(false)
+
+  const apply = useCallback((next: BoardState) => {
+    stateRef.current = next
+    readyRef.current = true
+    setState(next)
+  }, [])
+
+  const runExclusive = useCallback((task: () => Promise<void>) => {
+    const next = queueRef.current.then(task, task)
+    queueRef.current = next
+    return next
+  }, [])
+
+  const pull = useCallback(
+    () =>
+      runExclusive(async () => {
+        if (timerRef.current) {
+          window.clearTimeout(timerRef.current)
+          timerRef.current = null
+        }
+
+        setSync(readyRef.current ? 'refreshing' : 'loading')
+        try {
+          if (dirtyRef.current) {
+            dirtyRef.current = false
+            const saved = await saveBoard(stateRef.current)
+            apply(saved)
+          }
+
+          const remote = await fetchBoard()
+          if (dirtyRef.current) {
+            setSync('saving')
+            setSyncError(null)
+            return
+          }
+          if (!remote) {
+            const seeded = await saveBoard(structuredClone(SEED_STATE))
+            if (!dirtyRef.current) apply(seeded)
+          } else {
+            apply(remote)
+          }
+          setSync(dirtyRef.current ? 'saving' : 'live')
+          setSyncError(null)
+        } catch (error) {
+          setSync('error')
+          setSyncError(
+            error instanceof Error ? error.message : 'Could not reach the shared board.',
+          )
+        }
+      }),
+    [apply, runExclusive],
+  )
+
+  const scheduleSave = useCallback(
+    (next: BoardState) => {
+      dirtyRef.current = true
+      stateRef.current = next
+      setState(next)
+      if (timerRef.current) window.clearTimeout(timerRef.current)
+      timerRef.current = window.setTimeout(() => {
+        timerRef.current = null
+        dirtyRef.current = false
+        const snapshot = stateRef.current
+        void runExclusive(async () => {
+          setSync('saving')
+          try {
+            const saved = await saveBoard(snapshot)
+            if (!dirtyRef.current) apply(saved)
+            setSync('live')
+            setSyncError(null)
+          } catch (error) {
+            dirtyRef.current = true
+            setSync('error')
+            setSyncError(
+              error instanceof Error ? error.message : 'Could not save the shared board.',
+            )
+          }
+        })
+      }, 200)
+    },
+    [apply, runExclusive],
+  )
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    localStorage.removeItem('cs6310-board-v1')
+    void pull()
+    const onFocus = () => {
+      if (document.visibilityState === 'hidden') return
+      if (dirtyRef.current) return
+      void pull()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+      if (timerRef.current) window.clearTimeout(timerRef.current)
+    }
+  }, [pull])
 
-  const createTicket = useCallback((draft: TicketDraft) => {
-    setState((prev) => {
+  const createTicket = useCallback(
+    (draft: TicketDraft) => {
+      const prev = stateRef.current
       const now = new Date().toISOString()
       const ticket: Ticket = {
         id: crypto.randomUUID(),
@@ -59,58 +151,72 @@ export function useBoard() {
         createdAt: now,
         updatedAt: now,
       }
-      return {
+      scheduleSave({
         nextNumber: prev.nextNumber + 1,
         tickets: [ticket, ...prev.tickets],
-      }
-    })
-  }, [])
+        savedAt: prev.savedAt,
+      })
+    },
+    [scheduleSave],
+  )
 
-  const updateTicket = useCallback((id: string, draft: TicketDraft) => {
-    setState((prev) => ({
-      ...prev,
-      tickets: prev.tickets.map((t) =>
-        t.id === id
-          ? {
-              ...t,
-              title: draft.title.trim(),
-              description: draft.description.trim(),
-              status: draft.status,
-              priority: draft.priority,
-              type: draft.type,
-              assigneeId: draft.assigneeId,
-              storyPoints: draft.storyPoints,
-              labels: draft.labels,
-              updatedAt: new Date().toISOString(),
-            }
-          : t,
-      ),
-    }))
-  }, [])
+  const updateTicket = useCallback(
+    (id: string, draft: TicketDraft) => {
+      const prev = stateRef.current
+      scheduleSave({
+        ...prev,
+        tickets: prev.tickets.map((ticket) =>
+          ticket.id === id
+            ? {
+                ...ticket,
+                title: draft.title.trim(),
+                description: draft.description.trim(),
+                status: draft.status,
+                priority: draft.priority,
+                type: draft.type,
+                assigneeId: draft.assigneeId,
+                storyPoints: draft.storyPoints,
+                labels: draft.labels,
+                updatedAt: new Date().toISOString(),
+              }
+            : ticket,
+        ),
+      })
+    },
+    [scheduleSave],
+  )
 
-  const deleteTicket = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      tickets: prev.tickets.filter((t) => t.id !== id),
-    }))
-  }, [])
+  const deleteTicket = useCallback(
+    (id: string) => {
+      const prev = stateRef.current
+      scheduleSave({
+        ...prev,
+        tickets: prev.tickets.filter((ticket) => ticket.id !== id),
+      })
+    },
+    [scheduleSave],
+  )
 
-  const moveTicket = useCallback((id: string, status: Status) => {
-    setState((prev) => ({
-      ...prev,
-      tickets: prev.tickets.map((t) =>
-        t.id === id
-          ? { ...t, status, updatedAt: new Date().toISOString() }
-          : t,
-      ),
-    }))
-  }, [])
+  const moveTicket = useCallback(
+    (id: string, status: Status) => {
+      const prev = stateRef.current
+      scheduleSave({
+        ...prev,
+        tickets: prev.tickets.map((ticket) =>
+          ticket.id === id
+            ? { ...ticket, status, updatedAt: new Date().toISOString() }
+            : ticket,
+        ),
+      })
+    },
+    [scheduleSave],
+  )
 
   const resetBoard = useCallback(() => {
-    const next = structuredClone(SEED_STATE)
-    setState(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-  }, [])
+    scheduleSave(structuredClone(SEED_STATE))
+  }, [scheduleSave])
+
+  const refresh = useCallback(() => pull(), [pull])
 
   const ticketsByStatus = useMemo(() => {
     const map: Record<Status, Ticket[]> = {
@@ -120,19 +226,22 @@ export function useBoard() {
       review: [],
       done: [],
     }
-    for (const ticket of state.tickets) {
-      map[ticket.status].push(ticket)
-    }
+    for (const ticket of state.tickets) map[ticket.status].push(ticket)
     return map
   }, [state.tickets])
 
   return {
     tickets: state.tickets,
     ticketsByStatus,
+    savedAt: state.savedAt,
+    sync,
+    syncError,
+    ready: sync !== 'loading' && !(sync === 'error' && state.tickets.length === 0),
     createTicket,
     updateTicket,
     deleteTicket,
     moveTicket,
     resetBoard,
+    refresh,
   }
 }

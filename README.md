@@ -1,6 +1,8 @@
 # CS6310 Team Board
 
-A lightweight Jira-style ticket board for a CS6310 team project. Create, edit, search, and drag tickets across Backlog → To Do → In Progress → In Review → Done. Data is stored in the browser (`localStorage`), so the app is a static site you can push to GitHub and host on Netlify for free.
+A lightweight Jira-style ticket board for a CS6310 team project. Create, edit, search, and drag tickets across Backlog → To Do → In Progress → In Review → Done.
+
+Everyone shares one live JSON document, `board.json`. Creating, editing, or moving a ticket writes that file. **Refresh** pulls the latest copy so the whole team sees the same tickets. On Netlify the file is stored with Netlify Blobs. During `npm run dev` it is written to `data/board.json` on this computer.
 
 ## Features
 
@@ -10,7 +12,8 @@ A lightweight Jira-style ticket board for a CS6310 team project. Create, edit, s
 - Priority, assignee, story points, labels
 - Search and assignee filters
 - Sample CS6310 ride-sharing project tickets included
-- **Reset demo** restores the seed data
+- **Refresh** reloads `board.json` so you see teammates' updates
+- **Reset demo** restores the sample tickets for everyone
 
 ## Local development
 
@@ -63,5 +66,7 @@ netlify deploy --prod
 
 ## Notes
 
-- Tickets live in each visitor’s browser storage. Teammates do **not** share a live board unless you later add a backend.
+- The live board is `/board.json`. Netlify rewrites that URL to a function, so do not replace it with a static file.
+- The site has to be deployed from this GitHub repo (not a manual upload of `dist` only) so the function is included.
+- Two people editing at the same moment: the last save wins. Hit Refresh before a long editing session if others are working.
 - `netlify.toml` includes an SPA redirect so client routes keep working on refresh.
